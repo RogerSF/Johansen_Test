@@ -1,67 +1,7 @@
-
-'''
-function result = johansen(x,p=0,k=1)
-% PURPOSE: perform Johansen cointegration tests
-% -------------------------------------------------------
-% USAGE: result = johansen(x,p,k)
-% where:      x = input matrix of time-series in levels, (nobs x m)
-%             p = order of time polynomial in the null-hypothesis
-%                 p = -1, no deterministic part
-%                 p =  0, for constant term
-%                 p =  1, for constant plus time-trend
-%                 p >  1, for higher order polynomial
-%             k = number of lagged difference terms used when
-%                 computing the estimator
-% -------------------------------------------------------
-% RETURNS: a results structure:
-%          result.eig  = eigenvalues  (m x 1)
-%          result.evec = eigenvectors (m x m), where first
-%                        r columns are normalized coint vectors
-%          result.lr1  = likelihood ratio trace statistic for r=0 to m-1
-%                        (m x 1) vector
-%          result.lr2  = maximum eigenvalue statistic for r=0 to m-1
-%                        (m x 1) vector
-%          result.cvt  = critical values for trace statistic
-%                        (m x 3) vector [90% 95% 99%]
-%          result.cvm  = critical values for max eigen value statistic
-%                        (m x 3) vector [90% 95% 99%]
-%          result.ind  = index of co-integrating variables ordered by
-%                        size of the eigenvalues from large to small
-% -------------------------------------------------------
-% NOTE: c_sja(), c_sjt() provide critical values generated using
-%       a method of MacKinnon (1994, 1996).
-%       critical values are available for n<=12 and -1 <= p <= 1,
-%       zeros are returned for other cases.
-% -------------------------------------------------------
-% SEE ALSO: prt_coint, a function that prints results
-% -------------------------------------------------------
-% References: Johansen (1988), 'Statistical Analysis of Co-integration
-% vectors', Journal of Economic Dynamics and Control, 12, pp. 231-254.
-% MacKinnon, Haug, Michelis (1996) 'Numerical distribution
-% functions of likelihood ratio tests for cointegration',
-% Queen's University Institute for Economic Research Discussion paper.
-% (see also: MacKinnon's JBES 1994 article
-% -------------------------------------------------------
-
-% written by:
-% James P. LeSage, Dept of Economics
-% University of Toledo
-% 2801 W. Bancroft St,
-% Toledo, OH 43606
-% jlesage@spatial-econometrics.com
-
-% ****************************************************************
-% NOTE: Adina Enache provided some bug fixes and corrections that
-%       she notes below in comments. 4/10/2000
-% ****************************************************************
-'''
-
 import numpy as np
 from numpy import zeros, ones, flipud, log
 from numpy.linalg import inv, eig, cholesky as chol
 from statsmodels.regression.linear_model import OLS
-
-
 tdiff = np.diff
 
 class Holder(object):
@@ -80,8 +20,7 @@ import statsmodels.tsa.tsatools as tsat
 mlag = tsat.lagmat
 
 def mlag_(x, maxlag):
-    '''return all lags up to maxlag
-    '''
+
     return x[:-lag]
 
 def lag(x, lag):
@@ -143,18 +82,6 @@ def coint_johansen(x, p=0, k=1, print_on_console=True):
     temp = inv(chol(np.dot(du.T, np.dot(skk, du))))
     dt = np.dot(du, temp)
 
-
-    # JP: the next part can be done much  easier
-
-    # %      NOTE: At this point, the eigenvectors are aligned by column. To
-    # %            physically move the column elements using the MATLAB sort,
-    # %            take the transpose to put the eigenvectors across the row
-
-    # dt = transpose(dt)
-
-    # % sort eigenvalues and vectors
-
-    # au, auind = np.sort(diag(au))
     auind = np.argsort(au)
     # a = flipud(au)
     aind = flipud(auind)
@@ -162,32 +89,6 @@ def coint_johansen(x, p=0, k=1, print_on_console=True):
     # d = dt[aind,:]
     d = dt[:, aind]
 
-    # %NOTE: The eigenvectors have been sorted by row based on auind and moved to array "d".
-    # %      Put the eigenvectors back in column format after the sort by taking the
-    # %      transpose of "d". Since the eigenvectors have been physically moved, there is
-    # %      no need for aind at all. To preserve existing programming, aind is reset back to
-    # %      1, 2, 3, ....
-
-    # d  =  transpose(d)
-    # test = np.dot(transpose(d), np.dot(skk, d))
-
-    # %EXPLANATION:  The MATLAB sort function sorts from low to high. The flip realigns
-    # %auind to go from the largest to the smallest eigenvalue (now aind). The original procedure
-    # %physically moved the rows of dt (to d) based on the alignment in aind and then used
-    # %aind as a column index to address the eigenvectors from high to low. This is a double
-    # %sort. If you wanted to extract the eigenvector corresponding to the largest eigenvalue by,
-    # %using aind as a reference, you would get the correct eigenvector, but with sorted
-    # %coefficients and, therefore, any follow-on calculation would seem to be in error.
-    # %If alternative programming methods are used to evaluate the eigenvalues, e.g. Frame method
-    # %followed by a root extraction on the characteristic equation, then the roots can be
-    # %quickly sorted. One by one, the corresponding eigenvectors can be generated. The resultant
-    # %array can be operated on using the Cholesky transformation, which enables a unit
-    # %diagonalization of skk. But nowhere along the way are the coefficients within the
-    # %eigenvector array ever changed. The final value of the "beta" array using either method
-    # %should be the same.
-
-
-    # % Compute the trace and max eigenvalue statistics */
     lr1 = zeros(m)
     lr2 = zeros(m)
     cvm = zeros((m, 3))
@@ -206,8 +107,7 @@ def coint_johansen(x, p=0, k=1, print_on_console=True):
     # end
 
     result = Holder()
-    # % set up results structure
-    # estimation results, residuals
+
     result.rkt = rkt
     result.r0t = r0t
     result.eig = a
@@ -240,60 +140,6 @@ def coint_johansen(x, p=0, k=1, print_on_console=True):
     return result
 
 def c_sjt(n, p):
-
-# PURPOSE: find critical values for Johansen trace statistic
-# ------------------------------------------------------------
-# USAGE:  jc = c_sjt(n,p)
-# where:    n = dimension of the VAR system
-#               NOTE: routine doesn't work for n > 12
-#           p = order of time polynomial in the null-hypothesis
-#                 p = -1, no deterministic part
-#                 p =  0, for constant term
-#                 p =  1, for constant plus time-trend
-#                 p >  1  returns no critical values
-# ------------------------------------------------------------
-# RETURNS: a (3x1) vector of percentiles for the trace
-#          statistic for [90# 95# 99#]
-# ------------------------------------------------------------
-# NOTES: for n > 12, the function returns a (3x1) vector of zeros.
-#        The values returned by the function were generated using
-#        a method described in MacKinnon (1996), using his FORTRAN
-#        program johdist.f
-# ------------------------------------------------------------
-# SEE ALSO: johansen()
-# ------------------------------------------------------------
-# # References: MacKinnon, Haug, Michelis (1996) 'Numerical distribution
-# functions of likelihood ratio tests for cointegration',
-# Queen's University Institute for Economic Research Discussion paper.
-# -------------------------------------------------------
-
-# written by:
-# James P. LeSage, Dept of Economics
-# University of Toledo
-# 2801 W. Bancroft St,
-# Toledo, OH 43606
-# jlesage@spatial-econometrics.com
-#
-# Ported to Python by Javier Garcia
-# javier.macro.trader@gmail.com
-
-# these are the values from Johansen's 1995 book
-# for comparison to the MacKinnon values
-# jcp0 = [ 2.98   4.14   7.02
-#        10.35  12.21  16.16
-#        21.58  24.08  29.19
-#        36.58  39.71  46.00
-#        55.54  59.24  66.71
-#        78.30  86.36  91.12
-#       104.93 109.93 119.58
-#       135.16 140.74 151.70
-#       169.30 175.47 187.82
-#       207.21 214.07 226.95
-#       248.77 256.23 270.47
-#       293.83 301.95 318.14];
-
-
-
 
     jcp0 = ((2.9762, 4.1296, 6.9406),
             (10.4741, 12.3212, 16.3640),
@@ -353,41 +199,6 @@ def c_sjt(n, p):
     return jc
 
 def c_sja(n, p):
-
-# PURPOSE: find critical values for Johansen maximum eigenvalue statistic
-# ------------------------------------------------------------
-# USAGE:  jc = c_sja(n,p)
-# where:    n = dimension of the VAR system
-#           p = order of time polynomial in the null-hypothesis
-#                 p = -1, no deterministic part
-#                 p =  0, for constant term
-#                 p =  1, for constant plus time-trend
-#                 p >  1  returns no critical values
-# ------------------------------------------------------------
-# RETURNS: a (3x1) vector of percentiles for the maximum eigenvalue
-#          statistic for: [90# 95# 99#]
-# ------------------------------------------------------------
-# NOTES: for n > 12, the function returns a (3x1) vector of zeros.
-#        The values returned by the function were generated using
-#        a method described in MacKinnon (1996), using his FORTRAN
-#        program johdist.f
-# ------------------------------------------------------------
-# SEE ALSO: johansen()
-# ------------------------------------------------------------
-# References: MacKinnon, Haug, Michelis (1996) 'Numerical distribution
-# functions of likelihood ratio tests for cointegration',
-# Queen's University Institute for Economic Research Discussion paper.
-# -------------------------------------------------------
-
-# written by:
-# James P. LeSage, Dept of Economics
-# University of Toledo
-# 2801 W. Bancroft St,
-# Toledo, OH 43606
-# jlesage@spatial-econometrics.com
-# Ported to Python by Javier Garcia
-# javier.macro.trader@gmail.com
-
 
     jcp0 = ((2.9762, 4.1296, 6.9406),
             (9.4748, 11.2246, 15.0923),
